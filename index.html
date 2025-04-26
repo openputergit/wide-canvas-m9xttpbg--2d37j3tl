@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>College Attendance Management System</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<style>
+    * {
+        font-family: 'Poppins', sans-serif;
+    }
+    .loading {
+        @apply fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50;
+    }
+    .loading::after {
+        content: "";
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+<body class="bg-gray-100">
+    <div id="app" v-cloak>
+        <!-- Login Page -->
+        <div v-if="!isLoggedIn" class="min-h-screen flex items-center justify-center">
+            <div class="bg-white p-8 rounded-lg shadow-lg w-96">
+                <h1 class="text-2xl font-bold mb-6 text-center">Login</h1>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2">Username</label>
+                    <input type="text" v-model="loginForm.username" class="w-full p-2 border rounded">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2">Password</label>
+                    <input type="password" v-model="loginForm.password" class="w-full p-2 border rounded">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2">Role</label>
+                    <select v-model="loginForm.role" class="w-full p-2 border rounded">
+                        <option value="student">Student</option>
+                        <option value="faculty">Faculty</option>
+                    </select>
+                </div>
+                <button @click="login" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Login</button>
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div v-else>
+            <!-- Navigation -->
+            <nav class="bg-blue-600 text-white p-4">
+                <div class="container mx-auto flex justify-between items-center">
+                    <h1 class="text-xl font-bold">College AMS</h1>
+                    <div class="flex items-center gap-4">
+                        <span>Welcome, {{ currentUser.username }}</span>
+                        <button @click="logout" class="bg-red-500 px-4 py-2 rounded">Logout</button>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Faculty Dashboard -->
+            <div v-if="currentUser.role === 'faculty'" class="container mx-auto p-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Student Management -->
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h2 class="text-xl font-bold mb-4">Student Management</h2>
+                        <div class="space-y-4">
+                            <button @click="showAddStudentModal = true" class="w-full bg-green-500 text-white p-2 rounded">Add New Student</button>
+                            <div class="max-h-60 overflow-y-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b">
+                                            <th class="text-left p-2">Name</th>
+                                            <th class="text-left p-2">Roll No</th>
+                                            <th class="text-left p-2">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="student in students" :key="student._id" class="border-b">
+                                            <td class="p-2">{{ student.name }}</td>
+                                            <td class="p-2">{{ student.rollNo }}</td>
+                                            <td class="p-2">
+                                                <button @click="deleteStudent(student._id)" class="text-red-500"><i class="bi bi-trash"></i></button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Subject Management -->
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h2 class="text-xl font-bold mb-4">Subject Management</h2>
+                        <div class="space-y-4">
+                            <button @click="showAddSubjectModal = true" class="w-full bg-green-500 text-white p-2 rounded">Add New Subject</button>
+                            <div class="max-h-60 overflow-y-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b">
+                                            <th class="text-left p-2">Subject</th>
+                                            <th class="text-left p-2">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="subject in subjects" :key="subject._id" class="border-b">
+                                            <td class="p-2">{{ subject.name }}</td>
+                                            <td class="p-2">
+                                                <button @click="deleteSubject(subject._id)" class="text-red-500"><i class="bi bi-trash"></i></button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notice Management -->
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h2 class="text-xl font-bold mb-4">Notice Board</h2>
+                        <div class="space-y-4">
+                            <button @click="showAddNoticeModal = true" class="w-full bg-green-500 text-white p-2 rounded">Add New Notice</button>
+                            <div class="max-h-60 overflow-y-auto">
+                                <div v-for="notice in notices" :key="notice._id" class="border-b p-2">
+                                    <h3 class="font-bold">{{ notice.title }}</h3>
+                                    <p class="text-sm text-gray-600">{{ notice.content }}</p>
+                                    <p class="text-xs text-gray-400">{{ notice.date }}</p>
+                                    <button @click="deleteNotice(notice._id)" class="text-red-500 text-sm">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attendance Section -->
+                <div class="mt-8 bg-white p-4 rounded-lg shadow">
+                    <h2 class="text-xl font-bold mb-4">Mark Attendance</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <select v-model="selectedSubject" class="p-2 border rounded">
+                            <option value="">Select Subject</option>
+                            <option v-for="subject in subjects" :key="subject._id" :value="subject._id">
+                                {{ subject.name }}
+                            </option>
+                        </select>
+                        <input type="date" v-model="selectedDate" class="p-2 border rounded">
+                        <input type="text" v-model="lectureNotes" placeholder="Lecture Notes" class="p-2 border rounded">
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="p-2 text-left">Roll No</th>
+                                    <th class="p-2 text-left">Name</th>
+                                    <th class="p-2 text-left">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="student in students" :key="student._id" class="border-b">
+                                    <td class="p-2">{{ student.rollNo }}</td>
+                                    <td class="p-2">{{ student.name }}</td>
+                                    <td class="p-2">
+                                        <select v-model="attendance[student._id]" class="p-1 border rounded">
+                                            <option value="present">Present</option>
+                                            <option value="absent">Absent</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button @click="submitAttendance" class="mt-4 bg-blue-500 text-white p-2 rounded">Submit Attendance</button>
+                </div>
+            </div>
+
+            <!-- Student Dashboard -->
+            <div v-else class="container mx-auto p-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Attendance History -->
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h2 class="text-xl font-bold mb-4">My Attendance</h2>
+                        <div class="space-y-4">
+                            <select v-model="selectedSubject" class="w-full p-2 border rounded">
+                                <option value="">Select Subject</option>
+                                <option v-for="subject in subjects" :key="subject._id" :value="subject._id">
+                                    {{ subject.name }}
+                                </option>
+                            </select>
+                            <div class="max-h-60 overflow-y-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b">
+                                            <th class="text-left p-2">Date</th>
+                                            <th class="text-left p-2">Status</th>
+                                            <th class="text-left p-2">Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="record in filteredAttendance" :key="record._id" class="border-b">
+                                            <td class="p-2">{{ record.date }}</td>
+                                            <td class="p-2">{{ record.status }}</td>
+                                            <td class="p-2">{{ record.notes }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notice Board -->
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h2 class="text-xl font-bold mb-4">Notice Board</h2>
+                        <div class="max-h-96 overflow-y-auto">
+                            <div v-for="notice in notices" :key="notice._id" class="border-b p-2">
+                                <h3 class="font-bold">{{ notice.title }}</h3>
+                                <p class="text-sm text-gray-600">{{ notice.content }}</p>
+                                <p class="text-xs text-gray-400">{{ notice.date }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modals -->
+        <!-- Add Student Modal -->
+        <div v-if="showAddStudentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white p-6 rounded-lg w-96">
+                <h2 class="text-xl font-bold mb-4">Add New Student</h2>
+                <div class="space-y-4">
+                    <input type="text" v-model="newStudent.name" placeholder="Name" class="w-full p-2 border rounded">
+                    <input type="text" v-model="newStudent.rollNo" placeholder="Roll No" class="w-full p-2 border rounded">
+                    <input type="text" v-model="newStudent.username" placeholder="Username" class="w-full p-2 border rounded">
+                    <input type="password" v-model="newStudent.password" placeholder="Password" class="w-full p-2 border rounded">
+                    <div class="flex justify-end gap-2">
+                        <button @click="showAddStudentModal = false" class="bg-gray-500 text-white p-2 rounded">Cancel</button>
+                        <button @click="addStudent" class="bg-blue-500 text-white p-2 rounded">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Subject Modal -->
+        <div v-if="showAddSubjectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white p-6 rounded-lg w-96">
+                <h2 class="text-xl font-bold mb-4">Add New Subject</h2>
+                <div class="space-y-4">
+                    <input type="text" v-model="newSubject.name" placeholder="Subject Name" class="w-full p-2 border rounded">
+                    <div class="flex justify-end gap-2">
+                        <button @click="showAddSubjectModal = false" class="bg-gray-500 text-white p-2 rounded">Cancel</button>
+                        <button @click="addSubject" class="bg-blue-500 text-white p-2 rounded">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Notice Modal -->
+        <div v-if="showAddNoticeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white p-6 rounded-lg w-96">
+                <h2 class="text-xl font-bold mb-4">Add New Notice</h2>
+                <div class="space-y-4">
+                    <input type="text" v-model="newNotice.title" placeholder="Title" class="w-full p-2 border rounded">
+                    <textarea v-model="newNotice.content" placeholder="Content" class="w-full p-2 border rounded" rows="4"></textarea>
+                    <div class="flex justify-end gap-2">
+                        <button @click="showAddNoticeModal = false" class="bg-gray-500 text-white p-2 rounded">Cancel</button>
+                        <button @click="addNotice" class="bg-blue-500 text-white p-2 rounded">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div v-if="loading" class="loading"></div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    isLoggedIn: false,
+                    loading: false,
+                    currentUser: null,
+                    loginForm: {
+                        username: '',
+                        password: '',
+                        role: 'student'
+                    },
+                    students: [],
+                    subjects: [],
+                    notices: [],
+                    attendance: {},
+                    selectedSubject: '',
+                    selectedDate: '',
+                    lectureNotes: '',
+                    showAddStudentModal: false,
+                    showAddSubjectModal: false,
+                    showAddNoticeModal: false,
+                    newStudent: {
+                        name: '',
+                        rollNo: '',
+                        username: '',
+                        password: ''
+                    },
+                    newSubject: {
+                        name: ''
+                    },
+                    newNotice: {
+                        title: '',
+                        content: ''
+                    },
+                    appSlug: 'college-ams-123456'
+                }
+            },
+            methods: {
+                async login() {
+                    this.loading = true;
+                    try {
+                        const result = await this.fetchFromDB('read', 'users', null, {
+                            username: this.loginForm.username,
+                            password: this.loginForm.password,
+                            role: this.loginForm.role
+                        });
+                        
+                        if (result && result.length > 0) {
+                            this.currentUser = result[0];
+                            this.isLoggedIn = true;
+                            await this.loadData();
+                        } else {
+                            alert('Invalid credentials');
+                        }
+                    } catch (error) {
+                        console.error('Login error:', error);
+                        alert('Login failed');
+                    }
+                    this.loading = false;
+                },
+                logout() {
+                    this.isLoggedIn = false;
+                    this.currentUser = null;
+                    this.loginForm = {
+                        username: '',
+                        password: '',
+                        role: 'student'
+                    };
+                },
+                async loadData() {
+                    this.loading = true;
+                    try {
+                        this.students = await this.fetchFromDB('read', 'students');
+                        this.subjects = await this.fetchFromDB('read', 'subjects');
+                        this.notices = await this.fetchFromDB('read', 'notices');
+                    } catch (error) {
+                        console.error('Data loading error:', error);
+                    }
+                    this.loading = false;
+                },
+                async addStudent() {
+                    this.loading = true;
+                    try {
+                        await this.fetchFromDB('create', 'students', null, this.newStudent);
+                        await this.fetchFromDB('create', 'users', null, {
+                            username: this.newStudent.username,
+                            password: this.newStudent.password,
+                            role: 'student'
+                        });
+                        await this.loadData();
+                        this.showAddStudentModal = false;
+                        this.newStudent = {
+                            name: '',
+                            rollNo: '',
+                            username: '',
+                            password: ''
+                        };
+                    } catch (error) {
+                        console.error('Add student error:', error);
+                        alert('Failed to add student');
+                    }
+                    this.loading = false;
+                },
+                async addSubject() {
+                    this.loading = true;
+                    try {
+                        await this.fetchFromDB('create', 'subjects', null, this.newSubject);
+                        await this.loadData();
+                        this.showAddSubjectModal = false;
+                        this.newSubject = { name: '' };
+                    } catch (error) {
+                        console.error('Add subject error:', error);
+                        alert('Failed to add subject');
+                    }
+                    this.loading = false;
+                },
+                async addNotice() {
+                    this.loading = true;
+                    try {
+                        const notice = {
+                            ...this.newNotice,
+                            date: new Date().toLocaleDateString()
+                        };
+                        await this.fetchFromDB('create', 'notices', null, notice);
+                        await this.loadData();
+                        this.showAddNoticeModal = false;
+                        this.newNotice = {
+                            title: '',
+                            content: ''
+                        };
+                    } catch (error) {
+                        console.error('Add notice error:', error);
+                        alert('Failed to add notice');
+                    }
+                    this.loading = false;
+                },
+                async submitAttendance() {
+                    if (!this.selectedSubject || !this.selectedDate) {
+                        alert('Please select subject and date');
+                        return;
+                    }
+                    this.loading = true;
+                    try {
+                        const attendanceData = {
+                            date: this.selectedDate,
+                            subjectId: this.selectedSubject,
+                            notes: this.lectureNotes,
+                            records: this.attendance
+                        };
+                        await this.fetchFromDB('create', 'attendance', null, attendanceData);
+                        alert('Attendance submitted successfully');
+                        this.attendance = {};
+                        this.lectureNotes = '';
+                    } catch (error) {
+                        console.error('Submit attendance error:', error);
+                        alert('Failed to submit attendance');
+                    }
+                    this.loading = false;
+                },
+                async deleteStudent(id) {
+                    if (confirm('Are you sure you want to delete this student?')) {
+                        this.loading = true;
+                        try {
+                            await this.fetchFromDB('delete', 'students', id);
+                            await this.loadData();
+                        } catch (error) {
+                            console.error('Delete student error:', error);
+                            alert('Failed to delete student');
+                        }
+                        this.loading = false;
+                    }
+                },
+                async deleteSubject(id) {
+                    if (confirm('Are you sure you want to delete this subject?')) {
+                        this.loading = true;
+                        try {
+                            await this.fetchFromDB('delete', 'subjects', id);
+                            await this.loadData();
+                        } catch (error) {
+                            console.error('Delete subject error:', error);
+                            alert('Failed to delete subject');
+                        }
+                        this.loading = false;
+                    }
+                },
+                async deleteNotice(id) {
+                    if (confirm('Are you sure you want to delete this notice?')) {
+                        this.loading = true;
+                        try {
+                            await this.fetchFromDB('delete', 'notices', id);
+                            await this.loadData();
+                        } catch (error) {
+                            console.error('Delete notice error:', error);
+                            alert('Failed to delete notice');
+                        }
+                        this.loading = false;
+                    }
+                },
+                async fetchFromDB(action, collection, id = null, data = null, conditions = null) {
+                    try {
+                        const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/mongodb', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': 'Bearer aNRxVMEOjyWyjjJLv5jvdn1HT8n1',
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                appSlug: this.appSlug,
+                                action,
+                                collection,
+                                id,
+                                data,
+                                conditions
+                            })
+                        });
+                        const result = await response.json();
+                        return result.result[action === 'read' ? 'read' : 'create'];
+                    } catch (error) {
+                        console.error('Database operation error:', error);
+                        throw error;
+                    }
+                }
+            },
+            computed: {
+                filteredAttendance() {
+                    // Implementation for student's attendance view
+                    return [];
+                }
+            },
+            mounted() {
+                // Demo login credentials
+                console.log('Demo Login Credentials:');
+                console.log('Faculty - Username: 'faculty1', Password: 'faculty123');
+                console.log('Student - Username: 'student1', Password: 'student123');
+            }
+        }).mount('#app')
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
